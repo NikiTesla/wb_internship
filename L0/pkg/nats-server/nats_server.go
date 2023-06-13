@@ -3,19 +3,28 @@ package natsserver
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 	"wb_internship/pkg/orders"
+	"wb_internship/pkg/repository"
 
 	"github.com/nats-io/nats.go"
 )
 
 type NatsServer struct {
 	Addr string
+	DB   *repository.Postgres
 }
 
-func NewNatsServer(addr string) *NatsServer {
+func NewNatsServer(addr string, dbCfg repository.PgConfig) *NatsServer {
+	conn, err := repository.NewConn(dbCfg)
+	if err != nil {
+		log.Fatalf("cannot connect to database: %s", err)
+	}
+
 	return &NatsServer{
 		Addr: addr,
+		DB:   conn,
 	}
 }
 
