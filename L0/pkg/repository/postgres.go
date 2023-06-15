@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"time"
+	"wb_internship/pkg/orders"
 
 	"github.com/jackc/pgx"
 )
@@ -48,4 +49,36 @@ func NewConn(pgConfig PgConfig) (*Postgres, error) {
 	return &Postgres{
 		conn: conn,
 	}, nil
+}
+
+func (p *Postgres) Save(order orders.Order) error {
+	tx, err := p.conn.Begin()
+	if err != nil {
+		return fmt.Errorf("cannot begin transaction, err: %s", err)
+	}
+	defer tx.Rollback()
+
+	query := "INSERT INTO delivery_info(name, phone, zip, city, address, region, email)" +
+		"values($1, $2, $3, $4, $5, $6, $7)"
+
+	_, err = p.conn.Exec(query, order.Delivery.Name, order.Delivery.Phone, order.Delivery.Zip,
+		order.Delivery.City, order.Delivery.Address, order.Delivery.Region, order.Delivery.Email)
+	if err != nil {
+		return fmt.Errorf("cannot insert data about delivery, error: %s", err)
+	}
+
+	query = "INSERT INTO payment_info" +
+		"(transactions, request_id, currency, providerr, amount, payment_dt, bank, delivery_cost, goods_total, custom_fee)" +
+		"values($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
+
+	_, err = p.conn.Exec(query, order.Payment.Transaction, order.Payment.ReqestID, order.Payment.Currency,
+		order.Payment.Provider, order.Payment.Amount, order.Payment.PaymentDt, order.Payment.Bank,
+		order.Payment.DeliveryCost, order.Payment.GoodsTotal, order.Payment.CustomFee)
+	if err != nil {
+		return fmt.Errorf("cannot insert data about delivery, error: %s", err)
+	}
+
+	tx.Commit()
+
+	return nil
 }

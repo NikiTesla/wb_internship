@@ -12,8 +12,9 @@ import (
 )
 
 type NatsServer struct {
-	Addr string
-	DB   *repository.Postgres
+	Addr  string
+	DB    repository.Repo
+	Cache []orders.Order
 }
 
 func NewNatsServer(addr string, dbCfg repository.PgConfig) *NatsServer {
@@ -52,6 +53,11 @@ func (ns *NatsServer) Listen(sourceName string) error {
 			continue
 		}
 
-		fmt.Printf("Order got: %+v\n", newOrder)
+		ns.Cache = append(ns.Cache, newOrder)
+
+		err = ns.DB.Save(newOrder)
+		if err != nil {
+			log.Printf("Cannot save order in database! error: %s", err)
+		}
 	}
 }
