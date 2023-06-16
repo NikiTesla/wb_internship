@@ -1,84 +1,121 @@
 package repository
 
 import (
-	"context"
 	"fmt"
-	"time"
 	"wb_internship/pkg/orders"
 
-	"github.com/jackc/pgx"
+	_ "github.com/jackc/pgx/stdlib"
+	"github.com/jmoiron/sqlx"
 )
 
+// PgConfig is postgres' configuration
 type PgConfig struct {
 	Host     string `json:"host"`
 	Port     int    `json:"port"`
 	User     string `json:"user"`
 	Password string `json:"password"`
+	DBName   string `json:"db_name"`
 	Sslmode  string `json:"sslmode"`
 }
 
 type Postgres struct {
-	conn *pgx.ConnPool
+	db *sqlx.DB
 }
 
+// NewConn returns postgres struct with connected database.
+// Checks if connection is connection completed properly
 func NewConn(pgConfig PgConfig) (*Postgres, error) {
-	connConfig := pgx.ConnConfig{
-		Host:     pgConfig.Host,
-		Port:     uint16(pgConfig.Port),
-		User:     pgConfig.User,
-		Password: pgConfig.Password,
-		Database: "postgres",
-	}
+	pgConnString := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
+		pgConfig.User, pgConfig.Password, pgConfig.Host, pgConfig.Port, pgConfig.DBName, pgConfig.Sslmode)
 
-	poolConfig := pgx.ConnPoolConfig{
-		ConnConfig: connConfig,
-	}
-
-	conn, err := pgx.NewConnPool(poolConfig)
+	conn, err := sqlx.Connect("pgx", pgConnString)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create connection pool, error: %s", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	if err = conn.BeginBatch().Conn().Ping(ctx); err != nil {
-		return nil, err
-	}
-
 	return &Postgres{
-		conn: conn,
+		db: conn,
 	}, nil
 }
 
+// Save make named queries to save data about order in database tables
 func (p *Postgres) Save(order orders.Order) error {
-	tx, err := p.conn.Begin()
-	if err != nil {
-		return fmt.Errorf("cannot begin transaction, err: %s", err)
-	}
-	defer tx.Rollback()
+	p.db.MustExec("BEGIN")
+	defer p.db.Exec("ROLLBACK")
 
 	query := "INSERT INTO delivery_info(name, phone, zip, city, address, region, email)" +
-		"values($1, $2, $3, $4, $5, $6, $7)"
+		"values(:name, :phone, :zip, :city, :address, :region, :email) RETURNING id"
 
-	_, err = p.conn.Exec(query, order.Delivery.Name, order.Delivery.Phone, order.Delivery.Zip,
-		order.Delivery.City, order.Delivery.Address, order.Delivery.Region, order.Delivery.Email)
+	rows, err := p.db.NamedQuery(query, order.Delivery)
 	if err != nil {
 		return fmt.Errorf("cannot insert data about delivery, error: %s", err)
+	}
+	defer rows.Close()
+
+	var deliveryID int
+	for rows.Next() {
+		if err := rows.Scan(&deliveryID); err != nil {
+			return fmt.Errorf("cannot get delivery id from query, %s", err)
+		}
 	}
 
 	query = "INSERT INTO payment_info" +
 		"(transactions, request_id, currency, providerr, amount, payment_dt, bank, delivery_cost, goods_total, custom_fee)" +
-		"values($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
+		"values(:transaction, :request_id, :currency, :provider, :amount," +
+		" :payment_dt, :bank, :delivery_cost, :goods_total, :custom_fee) RETURNING id"
 
-	_, err = p.conn.Exec(query, order.Payment.Transaction, order.Payment.ReqestID, order.Payment.Currency,
-		order.Payment.Provider, order.Payment.Amount, order.Payment.PaymentDt, order.Payment.Bank,
-		order.Payment.DeliveryCost, order.Payment.GoodsTotal, order.Payment.CustomFee)
+	rows, err = p.db.NamedQuery(query, order.Payment)
 	if err != nil {
-		return fmt.Errorf("cannot insert data about delivery, error: %s", err)
+		return fmt.Errorf("cannot insert data about payment, error: %s", err)
 	}
 
-	tx.Commit()
+	var paymentID int
+	for rows.Next() {
+		if err := rows.Scan(&paymentID); err != nil {
+			return fmt.Errorf("cannot get delivery id from query, %s", err)
+		}
+	}
+
+	// creation of explicit relation between order, payment and delivery
+	order.Payment.ID = paymentID
+	order.Delivery.ID = deliveryID
+
+	query = "INSERT INTO orders" +
+		"(order_uid, track_number, entry, delivery_id, payment_id, " +
+		"locale, internal_signature, customer_id, delivery_service, " +
+		"shardkey, sm_id, date_created, oof_shard)" +
+		"values(:order_uid, :track_number, :entry, :delivery.id, :payment.id, " +
+		":locale, :internal_signature, :customer_id, :delivery_service, " +
+		":shardkey, :sm_id, :date_created, :oof_shard) RETURNING id"
+
+	rows, err = p.db.NamedQuery(query, order)
+	if err != nil {
+		return fmt.Errorf("cannot insert data about order, error: %s", err)
+	}
+	var orderID int
+	for rows.Next() {
+		if err := rows.Scan(&orderID); err != nil {
+			return fmt.Errorf("cannot get delivery id from query, %s", err)
+		}
+	}
+
+	for _, item := range order.Items {
+		// creation explicit relation between item and order
+		item.OrderId = int(orderID)
+
+		query = "INSERT INTO items" +
+			"(order_id, chrt_id, track_number, price, rid, name, sale, " +
+			"size, total_price, nm_id, brand, status)" +
+			"values(:order_id, :chrt_id, :track_number, :price, :rid, :name, :sale, " +
+			":size, :total_price, :nm_id, :brand, :status)"
+
+		_, err = p.db.NamedExec(query, item)
+		if err != nil {
+			return fmt.Errorf("cannot insert data about item, error: %s", err)
+		}
+	}
+
+	p.db.MustExec("COMMIT")
 
 	return nil
 }

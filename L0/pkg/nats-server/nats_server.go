@@ -11,12 +11,14 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
+// NatsServer is a main server to recieve and save orders in both in cache and database
 type NatsServer struct {
 	Addr  string
 	DB    repository.Repo
 	Cache []orders.Order
 }
 
+// NewNatsServer creates NatsServer with database connection
 func NewNatsServer(addr string, dbCfg repository.PgConfig) *NatsServer {
 	conn, err := repository.NewConn(dbCfg)
 	if err != nil {
@@ -29,6 +31,8 @@ func NewNatsServer(addr string, dbCfg repository.PgConfig) *NatsServer {
 	}
 }
 
+// Listen connects to nats-fs address and starts infinite loop to listen it
+// If order may be parsed correctly, save it both in cache and database
 func (ns *NatsServer) Listen(sourceName string) error {
 	nc, err := nats.Connect(ns.Addr)
 	if err != nil {

@@ -15,6 +15,8 @@ func main() {
 		Port:     5432,
 		User:     "postgres",
 		Password: "pass",
+		DBName:   "postgres",
+		Sslmode:  "disable",
 	}
 
 	server := natsserver.NewNatsServer(addr, cfg)

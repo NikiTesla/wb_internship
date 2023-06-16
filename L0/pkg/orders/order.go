@@ -6,6 +6,7 @@ import (
 	"os"
 )
 
+// NewOrder read order from file and returns Order struct
 func NewOrder(filename string) (*Order, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
