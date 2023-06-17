@@ -1,9 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"net/http"
+	"time"
 	natsserver "wb_internship/pkg/nats-server"
 	"wb_internship/pkg/repository"
+	restserver "wb_internship/pkg/rest-server"
 )
 
 const addr = "nats://127.0.0.1:9000"
@@ -19,6 +23,16 @@ func main() {
 		Sslmode:  "disable",
 	}
 
-	server := natsserver.NewNatsServer(addr, cfg)
-	log.Fatal(server.Listen("orders"))
+	natsServer := natsserver.NewNatsServer(addr, cfg)
+
+	rtr := restserver.Handler{NatsServer: natsServer}.InitRouter()
+	restServer := &http.Server{
+		Handler:      rtr,
+		Addr:         fmt.Sprintf(":%d", 8080),
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
+
+	go restServer.ListenAndServe()
+	log.Fatal(natsServer.Listen("orders"))
 }

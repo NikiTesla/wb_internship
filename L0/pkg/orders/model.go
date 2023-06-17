@@ -1,13 +1,14 @@
 package orders
 
 type Order struct {
+	ID          int    `db:"id"`
 	OrderUID    string `json:"order_uid" db:"order_uid"`
 	TrackNumber string `json:"track_number" db:"track_number"`
 	Entry       string `json:"entry" db:"entry"`
 
-	Delivery Delivery `json:"delivery" db:"delivery"`
-	Payment  Payment  `json:"payment" db:"payment"`
-	Items    []Item   `json:"items" db:"items"`
+	Delivery Delivery `json:"delivery" db:"d"`
+	Payment  Payment  `json:"payment" db:"p"`
+	Items    []Item   `json:"items"`
 
 	Locale            string `json:"locale" db:"locale"`
 	InternalSignature string `json:"internal_signature" db:"internal_signature"`
@@ -32,7 +33,7 @@ type Delivery struct {
 
 type Payment struct {
 	ID           int    `db:"id"`
-	Transaction  string `json:"transaction" db:"transaction"`
+	Transaction  string `json:"transaction" db:"transactions"`
 	ReqestID     string `json:"request_id" db:"request_id"`
 	Currency     string `json:"currency" db:"currency"`
 	Provider     string `json:"provider" db:"provider"`

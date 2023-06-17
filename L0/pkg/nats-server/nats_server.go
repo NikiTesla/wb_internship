@@ -15,7 +15,7 @@ import (
 type NatsServer struct {
 	Addr  string
 	DB    repository.Repo
-	Cache []orders.Order
+	Cache map[int]*orders.Order
 }
 
 // NewNatsServer creates NatsServer with database connection
@@ -26,14 +26,19 @@ func NewNatsServer(addr string, dbCfg repository.PgConfig) *NatsServer {
 	}
 
 	return &NatsServer{
-		Addr: addr,
-		DB:   conn,
+		Addr:  addr,
+		DB:    conn,
+		Cache: make(map[int]*orders.Order),
 	}
 }
 
 // Listen connects to nats-fs address and starts infinite loop to listen it
 // If order may be parsed correctly, save it both in cache and database
 func (ns *NatsServer) Listen(sourceName string) error {
+	if err := ns.LoadCacheFromDB(); err != nil {
+		return fmt.Errorf("cannot load cahce from database, %s", err)
+	}
+
 	nc, err := nats.Connect(ns.Addr)
 	if err != nil {
 		return fmt.Errorf("cannot connect to URL, error: %s", err)
@@ -57,11 +62,23 @@ func (ns *NatsServer) Listen(sourceName string) error {
 			continue
 		}
 
-		ns.Cache = append(ns.Cache, newOrder)
-
-		err = ns.DB.Save(newOrder)
+		orderID, err := ns.DB.Save(newOrder)
 		if err != nil {
 			log.Printf("Cannot save order in database! error: %s", err)
+			continue
 		}
+		ns.Cache[orderID] = &newOrder
 	}
+}
+
+func (ns *NatsServer) LoadCacheFromDB() error {
+	cache, err := ns.DB.LoadCache()
+	if err != nil {
+		return err
+	}
+
+	ns.Cache = cache
+	log.Printf("Cache was loaded from database. Length of cache: %d orders", len(ns.Cache))
+
+	return nil
 }

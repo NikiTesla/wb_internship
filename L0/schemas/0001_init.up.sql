@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS payment_info (
     transactions VARCHAR(255),
     request_id VARCHAR(55),
     currency VARCHAR(10),
-    providerr VARCHAR(55),
+    provider VARCHAR(55),
     amount INT,
     payment_dt INT,
     bank VARCHAR(55),
