@@ -19,8 +19,8 @@ type NatsServer struct {
 }
 
 // NewNatsServer creates NatsServer with database connection
-func NewNatsServer(addr string, dbCfg repository.PgConfig) *NatsServer {
-	conn, err := repository.NewConn(dbCfg)
+func NewNatsServer(addr string, pgConnStr string) *NatsServer {
+	conn, err := repository.NewConn(pgConnStr)
 	if err != nil {
 		log.Fatalf("cannot connect to database: %s", err)
 	}

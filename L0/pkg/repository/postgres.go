@@ -8,27 +8,14 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// PgConfig is postgres' configuration
-type PgConfig struct {
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	User     string `json:"user"`
-	Password string `json:"password"`
-	DBName   string `json:"db_name"`
-	Sslmode  string `json:"sslmode"`
-}
-
 type Postgres struct {
 	db *sqlx.DB
 }
 
 // NewConn returns postgres struct with connected database.
 // Checks if connection is connection completed properly
-func NewConn(pgConfig PgConfig) (*Postgres, error) {
-	pgConnString := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
-		pgConfig.User, pgConfig.Password, pgConfig.Host, pgConfig.Port, pgConfig.DBName, pgConfig.Sslmode)
-
-	conn, err := sqlx.Connect("pgx", pgConnString)
+func NewConn(connStr string) (*Postgres, error) {
+	conn, err := sqlx.Connect("pgx", connStr)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create connection pool, error: %s", err)
 	}

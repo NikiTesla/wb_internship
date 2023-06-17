@@ -4,26 +4,21 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 	natsserver "wb_internship/pkg/nats-server"
-	"wb_internship/pkg/repository"
 	restserver "wb_internship/pkg/rest-server"
+
+	"github.com/joho/godotenv"
 )
 
-const addr = "nats://127.0.0.1:9000"
-
 func main() {
-	// TODO put into configuting function
-	cfg := repository.PgConfig{
-		Host:     "localhost",
-		Port:     5432,
-		User:     "postgres",
-		Password: "pass",
-		DBName:   "postgres",
-		Sslmode:  "disable",
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
 	}
 
-	natsServer := natsserver.NewNatsServer(addr, cfg)
+	natsServer := natsserver.NewNatsServer(os.Getenv("NATS_URL"), os.Getenv("PG_CONFIG"))
 
 	rtr := restserver.Handler{NatsServer: natsServer}.InitRouter()
 	restServer := &http.Server{

@@ -1,4 +1,11 @@
 PROJECTNAME="wb_orders"
+NATSPORT=9000
+
+all: docker
+	@ echo "  >  running nats server on port $(NATSPORT)"
+	@ nats-server -js -p $(NATSPORT) &
+	@ echo "  >  running project..."
+	@ go run cmd/server/main.go
 
 docker:
 	@ echo "  >  making docker container $(PROJECTNAME)..."
