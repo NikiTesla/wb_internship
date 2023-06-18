@@ -56,18 +56,9 @@ func (ns *NatsServer) Listen(sourceName string) error {
 			continue
 		}
 
-		var newOrder orders.Order
-		if err = json.Unmarshal(msg.Data, &newOrder); err != nil {
-			fmt.Println(string(msg.Data))
-			continue
+		if err = ns.ExecMessage(msg); err != nil {
+			log.Print(err)
 		}
-
-		orderID, err := ns.DB.Save(newOrder)
-		if err != nil {
-			log.Printf("Cannot save order in database! error: %s", err)
-			continue
-		}
-		ns.Cache[orderID] = &newOrder
 	}
 }
 
@@ -79,6 +70,30 @@ func (ns *NatsServer) LoadCacheFromDB() error {
 
 	ns.Cache = cache
 	log.Printf("Cache was loaded from database. Length of cache: %d orders", len(ns.Cache))
+
+	return nil
+}
+
+func (ns *NatsServer) GetFromCache(id int) (*orders.Order, error) {
+	order, ok := ns.Cache[id]
+	if !ok {
+		return nil, fmt.Errorf("no such order")
+	}
+
+	return order, nil
+}
+
+func (ns *NatsServer) ExecMessage(msg *nats.Msg) error {
+	var newOrder orders.Order
+	if err := json.Unmarshal(msg.Data, &newOrder); err != nil {
+		return fmt.Errorf("there is not order data in recieved message. data: %s", string(msg.Data))
+	}
+
+	orderID, err := ns.DB.Save(newOrder)
+	if err != nil {
+		return fmt.Errorf("cannot save order in database: %s", err)
+	}
+	ns.Cache[orderID] = &newOrder
 
 	return nil
 }

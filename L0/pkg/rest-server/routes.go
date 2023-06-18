@@ -15,8 +15,8 @@ func (h *Handler) OrderGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	order, ok := h.Cache[id]
-	if !ok {
+	order, err := h.NatsServer.GetFromCache(id)
+	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("No such order saved"))
 		return

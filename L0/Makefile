@@ -7,6 +7,10 @@ all: docker
 	@ echo "  >  running project..."
 	@ go run cmd/server/main.go
 
+client:
+	@ echo "  >  running client"
+	@ go run cmd/client/main.go
+
 docker:
 	@ echo "  >  making docker container $(PROJECTNAME)..."
 	@ sudo docker compose up -d
